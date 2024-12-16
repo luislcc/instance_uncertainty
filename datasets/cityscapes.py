@@ -87,6 +87,9 @@ class Cityscapes(data.Dataset):
             raise ValueError('Invalid split for mode! Please use split="train", split="test"'
                              ' or split="val"')
 
+        print(self.images_dir)
+        print(self.targets_dir)
+
         if not os.path.isdir(self.images_dir) or not os.path.isdir(self.targets_dir):
             raise RuntimeError('Dataset not found or incomplete. Please make sure all required folders for the'
                                ' specified "split" and "mode" are inside the "root" directory')
@@ -124,7 +127,15 @@ class Cityscapes(data.Dataset):
         if self.transform:
             image, target = self.transform(image, target)
         target = self.encode_target(target)
-        return image, target
+
+        uncertainty_mask_name = self.images[index].split('/')[-1][:-4]
+        uncertainty_mask_path = f'uncertainty_masks/{uncertainty_mask_name}_uncertainty_mask.npy'
+        
+        if os.path.exists(os.path.join(self.root,uncertainty_mask_path)):
+            uncertainty_mask = np.load(os.path.join(self.root,uncertainty_mask_path))
+        else:
+            uncertainty_mask = []
+        return (image,self.images[index]), (target,uncertainty_mask)
 
     def __len__(self):
         return len(self.images)

@@ -20,13 +20,15 @@ class _StreamMetrics(object):
 
     def reset(self):
         """ Overridden by subclasses """
-        raise NotImplementedError()      
+        raise NotImplementedError()
 
 class StreamSegMetrics(_StreamMetrics):
     """
     Stream Metrics for Semantic Segmentation Task
     """
     def __init__(self, n_classes):
+        if n_classes == 1:
+            n_classes = 2
         self.n_classes = n_classes
         self.confusion_matrix = np.zeros((n_classes, n_classes))
 
@@ -38,12 +40,18 @@ class StreamSegMetrics(_StreamMetrics):
     def to_str(results):
         string = "\n"
         for k, v in results.items():
-            if k!="Class IoU":
+            if k!="Class IoU" and k !='Dice Score':
+                print(k)
                 string += "%s: %f\n"%(k, v)
         
-        #string+='Class IoU:\n'
-        #for k, v in results['Class IoU'].items():
-        #    string += "\tclass %d: %f\n"%(k, v)
+        string+='Class IoU:\n'
+        for k, v in results['Class IoU'].items():
+            string += "\tclass %d: %f\n"%(k, v)
+
+        string+='Class Dice:\n'
+        for k, v in results['Dice Score'].items():
+            string += "\tclass %d: %f\n"%(k, v)
+
         return string
 
     def _fast_hist(self, label_true, label_pred):
@@ -55,11 +63,12 @@ class StreamSegMetrics(_StreamMetrics):
         return hist
 
     def get_results(self):
-        """Returns accuracy score evaluation result.
+        """Returns evaluation metrics.
             - overall accuracy
             - mean accuracy
             - mean IU
             - fwavacc
+            - Dice score
         """
         hist = self.confusion_matrix
         acc = np.diag(hist).sum() / hist.sum()
@@ -71,13 +80,24 @@ class StreamSegMetrics(_StreamMetrics):
         fwavacc = (freq[freq > 0] * iu[freq > 0]).sum()
         cls_iu = dict(zip(range(self.n_classes), iu))
 
+        # Calculate Dice scores
+        dice_scores = {}
+        for i in range(self.n_classes):
+            tp = np.diag(hist)[i]
+            fp = hist[:, i].sum() - tp
+            fn = hist[i, :].sum() - tp
+            dice = (2 * tp) / (2 * tp + fp + fn) if (2 * tp + fp + fn) > 0 else np.nan
+            dice_scores[i] = dice
+
         return {
-                "Overall Acc": acc,
-                "Mean Acc": acc_cls,
-                "FreqW Acc": fwavacc,
-                "Mean IoU": mean_iu,
-                "Class IoU": cls_iu,
-            }
+            "Overall Acc": acc,
+            "Mean Acc": acc_cls,
+            "FreqW Acc": fwavacc,
+            "Mean IoU": mean_iu,
+            "Class IoU": cls_iu,
+            "Dice Score": dice_scores,
+        }
+
         
     def reset(self):
         self.confusion_matrix = np.zeros((self.n_classes, self.n_classes))

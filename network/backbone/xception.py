@@ -159,7 +159,7 @@ class Xception(nn.Module):
         #do relu here
         self.conv4 = SeparableConv2d(1536,2048,3,1,1, dilation=self.dilation)
         self.bn4 = nn.BatchNorm2d(2048)
-
+        print(num_classes)
         self.fc = nn.Linear(2048, num_classes)
 
         # #------- init weights --------
@@ -225,9 +225,9 @@ class Xception(nn.Module):
 def xception(num_classes=1000, pretrained='imagenet', replace_stride_with_dilation=None):
     model = Xception(num_classes=num_classes, replace_stride_with_dilation=replace_stride_with_dilation)
     if pretrained:
-        settings = pretrained_settings['xception'][pretrained]
-        assert num_classes == settings['num_classes'], \
-            "num_classes should be {}, but is {}".format(settings['num_classes'], num_classes)
+        settings = pretrained_settings['xception']['imagenet']
+        #assert num_classes == settings['num_classes'], \
+        #    "num_classes should be {}, but is {}".format(settings['num_classes'], num_classes)
 
         model = Xception(num_classes=num_classes, replace_stride_with_dilation=replace_stride_with_dilation)
         model.load_state_dict(model_zoo.load_url(settings['url']))

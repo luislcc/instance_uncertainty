@@ -1,6 +1,7 @@
 import collections
 import torchvision
 import torch
+import torchvision.transforms as T
 import torchvision.transforms.functional as F
 import random 
 import numbers
@@ -33,8 +34,6 @@ class ExtRandomHorizontalFlip(object):
 
     def __repr__(self):
         return self.__class__.__name__ + '(p={})'.format(self.p)
-
-
 
 class ExtCompose(object):
     """Composes several transforms together.
@@ -408,9 +407,9 @@ class ExtResize(object):
             ``PIL.Image.BILINEAR``
     """
 
-    def __init__(self, size, interpolation=Image.BILINEAR):
+    def __init__(self, size, interpolation=torchvision.transforms.functional.InterpolationMode.BILINEAR):
         assert isinstance(size, int) or (isinstance(size, collections.Iterable) and len(size) == 2)
-        self.size = size
+        self.size = (size,size)
         self.interpolation = interpolation
 
     def __call__(self, img, lbl):
@@ -420,7 +419,8 @@ class ExtResize(object):
         Returns:
             PIL Image: Rescaled image.
         """
-        return F.resize(img, self.size, self.interpolation), F.resize(lbl, self.size, Image.NEAREST)
+        #print(F.resize(img, self.size, self.interpolation))
+        return F.resize(img, self.size,self.interpolation), F.resize(lbl, self.size, Image.NEAREST)
 
     def __repr__(self):
         interpolate_str = _pil_interpolation_to_str[self.interpolation]

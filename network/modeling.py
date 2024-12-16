@@ -1,13 +1,13 @@
 from .utils import IntermediateLayerGetter
-from ._deeplab import DeepLabHead, DeepLabHeadV3Plus, DeepLabV3
+from ._deeplab import DeepLabHead, DeepLabHeadV3Plus, DeepLabV3, DeepEnsemble
 from .backbone import (
     resnet,
     mobilenetv2,
     hrnetv2,
     xception
-)
+    )
 
-def _segm_hrnet(name, backbone_name, num_classes, pretrained_backbone):
+def _segm_hrnet(name, backbone_name, num_classes, pretrained_backbone,dropout=None):
 
     backbone = hrnetv2.__dict__[backbone_name](pretrained_backbone)
     # HRNetV2 config:
@@ -29,7 +29,7 @@ def _segm_hrnet(name, backbone_name, num_classes, pretrained_backbone):
     model = DeepLabV3(backbone, classifier)
     return model
 
-def _segm_resnet(name, backbone_name, num_classes, output_stride, pretrained_backbone):
+def _segm_resnet(name, backbone_name, num_classes, output_stride, pretrained_backbone, dropout=None):
 
     if output_stride==8:
         replace_stride_with_dilation=[False, True, True]
@@ -38,9 +38,16 @@ def _segm_resnet(name, backbone_name, num_classes, output_stride, pretrained_bac
         replace_stride_with_dilation=[False, False, True]
         aspp_dilate = [6, 12, 18]
 
-    backbone = resnet.__dict__[backbone_name](
-        pretrained=pretrained_backbone,
-        replace_stride_with_dilation=replace_stride_with_dilation)
+    if dropout != None:
+        backbone = resnet_dropout.__dict__[backbone_name](
+                pretrained=pretrained_backbone,
+                replace_stride_with_dilation=replace_stride_with_dilation,dropout=dropout)
+
+    else:
+        print('no dropout')
+        backbone = resnet.__dict__[backbone_name](
+                pretrained=pretrained_backbone,
+                replace_stride_with_dilation=replace_stride_with_dilation)
     
     inplanes = 2048
     low_level_planes = 256
@@ -57,7 +64,8 @@ def _segm_resnet(name, backbone_name, num_classes, output_stride, pretrained_bac
     return model
 
 
-def _segm_xception(name, backbone_name, num_classes, output_stride, pretrained_backbone):
+def _segm_xception(name, backbone_name, num_classes, output_stride, pretrained_backbone,dropout=None):
+    print(num_classes)
     if output_stride==8:
         replace_stride_with_dilation=[False, False, True, True]
         aspp_dilate = [12, 24, 36]
@@ -65,7 +73,7 @@ def _segm_xception(name, backbone_name, num_classes, output_stride, pretrained_b
         replace_stride_with_dilation=[False, False, False, True]
         aspp_dilate = [6, 12, 18]
     
-    backbone = xception.xception(pretrained= 'imagenet' if pretrained_backbone else False, replace_stride_with_dilation=replace_stride_with_dilation)
+    backbone = xception.xception(num_classes,pretrained_backbone, replace_stride_with_dilation=replace_stride_with_dilation)
     
     inplanes = 2048
     low_level_planes = 128
@@ -81,7 +89,7 @@ def _segm_xception(name, backbone_name, num_classes, output_stride, pretrained_b
     return model
 
 
-def _segm_mobilenet(name, backbone_name, num_classes, output_stride, pretrained_backbone):
+def _segm_mobilenet(name, backbone_name, num_classes, output_stride, pretrained_backbone,dropout=None):
     if output_stride==8:
         aspp_dilate = [12, 24, 36]
     else:
@@ -109,16 +117,22 @@ def _segm_mobilenet(name, backbone_name, num_classes, output_stride, pretrained_
     model = DeepLabV3(backbone, classifier)
     return model
 
-def _load_model(arch_type, backbone, num_classes, output_stride, pretrained_backbone):
+def _segm_deep_ensemble(models):
+    model = DeepEnsemble(models)
+    return model
 
-    if backbone=='mobilenetv2':
-        model = _segm_mobilenet(arch_type, backbone, num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
+def _load_model(arch_type, backbone, num_classes, output_stride, pretrained_backbone,models=None,dropout=None):
+
+    if arch_type=='deep_ensemble':
+        model = _segm_deep_ensemble(models)
+    elif backbone=='mobilenetv2':
+        model = _segm_mobilenet(arch_type, backbone, num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone,dropout=dropout)
     elif backbone.startswith('resnet'):
-        model = _segm_resnet(arch_type, backbone, num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
+        model = _segm_resnet(arch_type, backbone, num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone,dropout=dropout)
     elif backbone.startswith('hrnetv2'):
-        model = _segm_hrnet(arch_type, backbone, num_classes, pretrained_backbone=pretrained_backbone)
+        model = _segm_hrnet(arch_type, backbone, num_classes, pretrained_backbone=pretrained_backbone,dropout=dropout)
     elif backbone=='xception':
-        model = _segm_xception(arch_type, backbone, num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
+        model = _segm_xception(arch_type, backbone, num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone,dropout=dropout)
     else:
         raise NotImplementedError
     return model
@@ -141,7 +155,7 @@ def deeplabv3_resnet50(num_classes=21, output_stride=8, pretrained_backbone=True
     """
     return _load_model('deeplabv3', 'resnet50', num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
 
-def deeplabv3_resnet101(num_classes=21, output_stride=8, pretrained_backbone=True):
+def deeplabv3_resnet101(num_classes=21, output_stride=8, pretrained_backbone=False):
     """Constructs a DeepLabV3 model with a ResNet-101 backbone.
 
     Args:
@@ -173,13 +187,13 @@ def deeplabv3_xception(num_classes=21, output_stride=8, pretrained_backbone=True
 
 
 # Deeplab v3+
-def deeplabv3plus_hrnetv2_48(num_classes=21, output_stride=4, pretrained_backbone=False): # no pretrained backbone yet
-    return _load_model('deeplabv3plus', 'hrnetv2_48', num_classes, output_stride, pretrained_backbone=pretrained_backbone)
+def deeplabv3plus_hrnetv2_48(num_classes=21, output_stride=4, pretrained_backbone=False, dropout=None): # no pretrained backbone yet
+    return _load_model('deeplabv3plus', 'hrnetv2_48', num_classes, output_stride, pretrained_backbone=pretrained_backbone,dropout=dropout)
 
-def deeplabv3plus_hrnetv2_32(num_classes=21, output_stride=4, pretrained_backbone=True):
-    return _load_model('deeplabv3plus', 'hrnetv2_32', num_classes, output_stride, pretrained_backbone=pretrained_backbone)
+def deeplabv3plus_hrnetv2_32(num_classes=21, output_stride=4, pretrained_backbone=False, dropout=None):
+    return _load_model('deeplabv3plus', 'hrnetv2_32', num_classes, output_stride, pretrained_backbone=pretrained_backbone,dropout=dropout)
 
-def deeplabv3plus_resnet50(num_classes=21, output_stride=8, pretrained_backbone=True):
+def deeplabv3plus_resnet50(num_classes=21, output_stride=8, pretrained_backbone=True,dropout=None):
     """Constructs a DeepLabV3 model with a ResNet-50 backbone.
 
     Args:
@@ -187,10 +201,11 @@ def deeplabv3plus_resnet50(num_classes=21, output_stride=8, pretrained_backbone=
         output_stride (int): output stride for deeplab.
         pretrained_backbone (bool): If True, use the pretrained backbone.
     """
-    return _load_model('deeplabv3plus', 'resnet50', num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
+    print(dropout)
+    return _load_model('deeplabv3plus', 'resnet50', num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone,dropout=dropout)
 
 
-def deeplabv3plus_resnet101(num_classes=21, output_stride=8, pretrained_backbone=True):
+def deeplabv3plus_resnet101(num_classes=21, output_stride=8, pretrained_backbone=True,dropout=None):
     """Constructs a DeepLabV3+ model with a ResNet-101 backbone.
 
     Args:
@@ -198,10 +213,10 @@ def deeplabv3plus_resnet101(num_classes=21, output_stride=8, pretrained_backbone
         output_stride (int): output stride for deeplab.
         pretrained_backbone (bool): If True, use the pretrained backbone.
     """
-    return _load_model('deeplabv3plus', 'resnet101', num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
+    return _load_model('deeplabv3plus', 'resnet101', num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone,dropout=dropout)
 
 
-def deeplabv3plus_mobilenet(num_classes=21, output_stride=8, pretrained_backbone=True):
+def deeplabv3plus_mobilenet(num_classes=21, output_stride=8, pretrained_backbone=True,dropout=None):
     """Constructs a DeepLabV3+ model with a MobileNetv2 backbone.
 
     Args:
@@ -209,9 +224,9 @@ def deeplabv3plus_mobilenet(num_classes=21, output_stride=8, pretrained_backbone
         output_stride (int): output stride for deeplab.
         pretrained_backbone (bool): If True, use the pretrained backbone.
     """
-    return _load_model('deeplabv3plus', 'mobilenetv2', num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
+    return _load_model('deeplabv3plus', 'mobilenetv2', num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone,dropout=dropout)
 
-def deeplabv3plus_xception(num_classes=21, output_stride=8, pretrained_backbone=True):
+def deeplabv3plus_xception(num_classes=21, output_stride=8, pretrained_backbone=False,dropout=None):
     """Constructs a DeepLabV3+ model with a Xception backbone.
 
     Args:
@@ -219,4 +234,8 @@ def deeplabv3plus_xception(num_classes=21, output_stride=8, pretrained_backbone=
         output_stride (int): output stride for deeplab.
         pretrained_backbone (bool): If True, use the pretrained backbone.
     """
-    return _load_model('deeplabv3plus', 'xception', num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
+    print(num_classes)
+    return _load_model('deeplabv3plus', 'xception', num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone,dropout=dropout)
+
+def deep_ensemble(models,num_classes,output_stride):
+    return _load_model('deep_ensemble','resnet50',num_classes,output_stride,False,models)

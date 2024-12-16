@@ -161,7 +161,19 @@ class ASPP(nn.Module):
         res = torch.cat(res, dim=1)
         return self.project(res)
 
+class DeepEnsemble(nn.Module):
+    def __init__(self,models):
+        super().__init__()
+        self.models = models
 
+    def forward(self,x):
+        outputs = [model(x) for model in self.models]
+        outputs = [F.softmax(output,dim=1) for output in outputs]
+        #print(outputs[0].view(768,768,19)[0][0])
+        #print(outputs[0].shape)
+        out = torch.mean(torch.stack(outputs), dim=0)
+        #print(out.shape)
+        return out
 
 def convert_to_separable_conv(module):
     new_module = module
