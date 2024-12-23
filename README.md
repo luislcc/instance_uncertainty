@@ -20,6 +20,7 @@ To train an ensemble of models by computing the instance-wise uncertainty masks 
 ```bash
 python main.py --model ensemble --gpu_id 0 --crop_val --crop_size 768 --batch_size 2 --val_batch_size 1 --output_stride 16 --dataset acdc --data_root ./datasets/data/ACDC --total_itrs 50000 --random_seed -1 --member deeplabv3plus_resnet101 --member deeplabv3plus_resnet50 --member deeplabv3plus_mobilenet --ensemble_lr 0.0001 --ensemble_lr 0.0001 --ensemble_lr 0.001
 ```
+### Experiment 2
 To train the ensemble without instance-wise uncertainty masks, replace the criterion loss function with the standard cross-entropy loss. To evaluate model performance under domain-shift, simply evaluate a model trained on ACDC on the CityScapes dataset and vice-versa, as such:
 ```bash
 python main.py --model deeplabv3plus_resnet101 --ckpt checkpoints/best_deeplabv3plus_resnet101_acdc_os16_seed7830581.pth --gpu_id 0 --crop_val --crop_size 768 --batch_size 2 --val_batch_size 1 --output_stride 16 --dataset cityscapes --data_root ./datasets/data/cityscapes --random_seed -1 --test_only
