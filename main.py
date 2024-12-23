@@ -245,16 +245,12 @@ def make_uncertainty_masks(opts, model, loader, device, metrics, ret_samples_ids
 
 
             outputs = model(images)
-            #uncertainty = utils.entropy(outputs).detach().cpu().numpy()
-            #uncertainty = uncertainty.squeeze()
-            #print(outputs.shape)
+
             probs = outputs
             log_probs = torch.log(probs+1e-10)
             entropy = -torch.sum(probs * log_probs, dim=1)
             uncertainty = entropy.detach().cpu().numpy()
             uncertainty = uncertainty.squeeze()
-
-            #print(probs.shape)
 
 
             uncertainty_mask = create_instance_uncertainty_mask(probs,uncertainty,opts.num_classes,opts.crop_size)
@@ -279,12 +275,6 @@ def create_instance_uncertainty_mask(logits_seg_mask,pixel_uncertainty_mask_np,n
         #Create a binary mask where the elements equal to k are set to 1, and others to 0
         binary_mask = (preds_seg_mask_np == k).astype(np.uint8)
 
-        #print(preds_seg_mask_np)
-
-        #print(binary_mask)
-
-        # Use cv2.connectedComponents to find the connected components
-        #print(binary_mask.shape)
         num_labels, labels = cv2.connectedComponents(binary_mask)
 
         # For each connected component, compute its mean uncertainty and store it in the resulting uncertainty mask
@@ -546,10 +536,6 @@ def main():
         {'params': model.classifier.parameters(), 'lr': opts.lr},
         ], lr=opts.lr, weight_decay=opts.weight_decay)
 
-        '''optimizer = torch.optim.SGD(params=[
-        {'params': model.backbone.parameters(), 'lr': 0.1 * opts.lr},
-        {'params': model.classifier.parameters(), 'lr': opts.lr},
-    ], lr=opts.lr, momentum=0.9, weight_decay=opts.weight_decay)'''
         if opts.lr_policy == 'poly':
             scheduler = utils.PolyLR(optimizer, opts.total_itrs, power=0.9)
         elif opts.lr_policy == 'step':
@@ -643,7 +629,6 @@ def main():
     denorm = utils.Denormalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  # denormalization for ori images
 
     if opts.model=='ensemble':
-        print('ok')
         
         interval_loss = [0 for i in range(len(models))]
         miou_history = []
@@ -677,11 +662,14 @@ def main():
                 pixel_uncertainty = pixel_uncertainty.detach().cpu().numpy()
                 instance_uncertainty = []
 
+                print(pixel_uncertainty.shape)
+
                 for i in range(pixel_uncertainty.shape[0]):
                     instance_uncertainty.append(create_instance_uncertainty_mask(ensemble_out[i],pixel_uncertainty[i],opts.num_classes,opts.crop_size))
                     
                 instance_uncertainty = torch.tensor(np.array(instance_uncertainty))
                 instance_uncertainty = instance_uncertainty.to(device,dtype=torch.float32)
+                print(instance_uncertainty.shape)
 
                 for i in range(len(models)):
                     optimizers[i].zero_grad()      
